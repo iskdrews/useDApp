@@ -1,6 +1,6 @@
 import { TransactionOptions } from '../model/TransactionOptions'
 import { useConfig } from './useConfig'
-import { Contract, providers } from 'ethers'
+import { Contract, providers, BigNumber } from 'ethers'
 import { useCallback, useState } from 'react'
 import { useEthers } from './useEthers'
 import { estimateContractFunctionGasLimit, usePromiseTransaction } from './usePromiseTransaction'
@@ -66,7 +66,8 @@ export function connectContractToSigner(contract: Contract, options?: Transactio
 export function useContractFunction<T extends TypedContract, FN extends ContractFunctionNames<T>>(
   contract: T | Falsy,
   functionName: FN,
-  options?: TransactionOptions
+  options?: TransactionOptions,
+  gasLimitAmount?: BigNumber | undefined
 ) {
   const { library, chainId } = useEthers()
   const { promiseTransaction, state, resetState } = usePromiseTransaction(chainId, options)
@@ -81,17 +82,25 @@ export function useContractFunction<T extends TypedContract, FN extends Contract
         const contractWithSigner = connectContractToSigner(contract, options, library)
         const opts = hasOpts ? args[args.length - 1] : undefined
 
-        const gasLimit = await estimateContractFunctionGasLimit(
-          contractWithSigner,
-          functionName,
-          args,
-          bufferGasLimitPercentage
-        )
+        let gasLimit: BigNumber | undefined
+
+        // If the gasLimit is not set manually, it will be set automatically.
+        if (!gasLimitAmount) {
+          gasLimit = await estimateContractFunctionGasLimit(
+            contractWithSigner,
+            functionName,
+            args,
+            bufferGasLimitPercentage
+          )
+        } else {
+          gasLimit = gasLimitAmount
+        }
 
         const modifiedOpts = {
           ...opts,
           gasLimit,
         }
+
         const modifiedArgs = hasOpts ? args.slice(0, args.length - 1) : args
         modifiedArgs.push(modifiedOpts)
 
